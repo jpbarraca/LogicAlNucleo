@@ -1,5 +1,4 @@
-LogicNucleo
-===========
+# LogicNucleo
 
 A SUMP compatible Logical Analyser for the STM32F4 up to 10MSPS, 8Ch, 32K Samples memory.
 
@@ -11,24 +10,20 @@ PORTB is current used, and Pins PB_0 to PB_7 are reported. Unfortunately these p
 
 This implementation was based in the [mbed](https://mbed.org/) environment in order to increase its compatibility as new targets are expected to be supported. The focus of this implementation is compatibility and extensibility.
 
-Features
-===========
+## Features
 
-Supported
------------
+### Supported
 - Configurable sampling rate up to 10Mhz on the F401RE platform
 - Basic parallel triggers
 - Generic compatibility through the MBED API
 
-Planned
------------
+### Planned
 - RLE support
 - Serial triggers
 - Post trigger delay
 - External and Internal test modes
 
-Screenshots
-===========
+## Screenshots
 Just to prove it works and because screenshots are always nice.
 
 Channel 4 with a signal permanently set to 1, others set to 0.
