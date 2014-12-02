@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>LogicAl Nucleo by jpbarraca</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>LogicAl Nucleo</h1>
+        <h2>A SUMP compatible Logical Analyser for the NucleoF401RE</h2>
+        <a href="https://github.com/jpbarraca/LogicalNucleo" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a id="logicalnucleo" class="anchor" href="#logicalnucleo" aria-hidden="true"><span class="octicon octicon-link"></span></a>LogicAlNucleo</h1>
+
+<p>A SUMP compatible Logical Analyser for the NucleoF401RE (STM32F4xx) up to 10MSPS, 8Ch, 32K samples memory.</p>
+
+<p>This will turn any NucleoF401RE (will work with others but it is not tested) system into a Logical Analyser compatible with a subset of the SUMP protocol. It can be used with clients such as <a href="http://sigrok.org/wiki/PulseView">PulseView</a>, <a href="http://sigrok.org/wiki/Sigrok-cli">sigrok-cli</a>, and <a href="http://www.lxtreme.nl/ols/">LogicSniffer</a>. While it is not as feature complete as other products, such as the <a href="http://dangerousprototypes.com/docs/Open_Bench_Logic_Sniffer">OLS</a>, it can turn that STM32 board that is lying around into a no frills, bare to the bones, logic analyser.</p>
+
+<p>Sampling rate up to 500Khz should work on most platforms. Higher than that, only the F401RE, or other similar 84Mhz platform, should provide results with accurate timing measurements up to 10Mhz (probably near 20Mhz is achievable). If you wish to add support for other platforms, please focus in creating the appropriate unrolled loops. +150Mhz platforms can be easily supported as the more generic approach (wait_ns) can be used.</p>
+
+<p>PORTB is current used, and Pins PB_0 to PB_7 are reported. Unfortunately these pins are scattered over the board and are not contiguous. Check <a href="http://developer.mbed.org/platforms/ST-Nucleo-F401RE/">this</a> diagram to find them.</p>
+
+<p>This implementation was based in the <a href="https://mbed.org/">mbed</a> environment in order to increase its compatibility, as new targets are expected to be supported. The focus of this implementation is compatibility and extensibility, and not only performance.</p>
+
+<h2>
+<a id="features" class="anchor" href="#features" aria-hidden="true"><span class="octicon octicon-link"></span></a>Features</h2>
+
+<h3>
+<a id="supported" class="anchor" href="#supported" aria-hidden="true"><span class="octicon octicon-link"></span></a>Supported</h3>
+
+<ul>
+<li>Configurable sampling rate up to 10Mhz on the F401RE platform</li>
+<li>Basic parallel triggers</li>
+<li>Generic compatibility through the MBED API</li>
+</ul>
+
+<h3>
+<a id="planned" class="anchor" href="#planned" aria-hidden="true"><span class="octicon octicon-link"></span></a>Planned</h3>
+
+<ul>
+<li>RLE support</li>
+<li>Serial triggers</li>
+<li>Post trigger delay</li>
+<li>External and Internal test modes</li>
+</ul>
+
+<h2>
+<a id="screenshots" class="anchor" href="#screenshots" aria-hidden="true"><span class="octicon octicon-link"></span></a>Screenshots</h2>
+
+<p>Just to prove it works and because screenshots are always nice.</p>
+
+<p>Channel 4 with a signal permanently set to 1, others set to 0.
+This capture was made using the test mode active. In this mode the board will provide a PWM signal in D9, with a period of 50us and pulse width of 20us (30us off). This pin was connected to D4 (PB_3) and sampled with great accuracy at 1Mhz.</p>
+
+<p><img src="https://raw.githubusercontent.com/jpbarraca/LogicalNucleo/master/screenshots/screen1.png" alt="alt text" title="LogicSniffer in Test Mode"></p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/jpbarraca/LogicalNucleo/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/jpbarraca/LogicalNucleo/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/jpbarraca/LogicalNucleo"></a> is maintained by <a href="https://github.com/jpbarraca">jpbarraca</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
