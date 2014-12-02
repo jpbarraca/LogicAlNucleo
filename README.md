@@ -35,3 +35,6 @@ Channel 4 with a signal permanently set to 1, others set to 0.
 This capture was made using the test mode active. In this mode the board will provide a PWM signal in D9, with a period of 50us and pulse width of 20us. This pin was connected to D4 (PB_3) and sampled with great accuracy at 1Mhz.
 
 
+![alt text](https://raw.githubusercontent.com/jpbarraca/LogicNucleo/master/screenshots/screen1.png "LogicSniffer in Test Mode")
+
+
