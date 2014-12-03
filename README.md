@@ -33,3 +33,10 @@ This capture was made using the test mode active. In this mode the board will pr
 ![alt text](https://raw.githubusercontent.com/jpbarraca/LogicalNucleo/master/screenshots/screen1.png "LogicSniffer in Test Mode")
 
 
+## Download
+
+Get the source code from github and compile it using the ARM toolchain available from the [Launchpad page](https://launchpad.net/gcc-arm-embedded/+download). If you have the toolchain available, the makefile will take care of all compilation and linking.
+
+In alternative you can also use the code in [mbed](https://mbed.org/). 
+
+Finally download the latest precompiled binary from the [releases web page](https://github.com/jpbarraca/LogicAlNucleo/releases) and burn it. The binary file suits the NUCLEO-F401RE board.
