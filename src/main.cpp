@@ -110,7 +110,7 @@ void handleSerial()
             break;    
         }
         case SUMP_ARM: {
-            sampler.start();
+            sampler.arm();
             break;
         }
         case SUMP_XON: {
@@ -160,6 +160,28 @@ void handleSerial()
 int main()
 {
     pc.baud(115200);
+    volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004; //address of the register
+    volatile unsigned int *DWT_CONTROL  = (volatile unsigned int *)0xE0001000; //address of the register
+    volatile unsigned int *SCB_DEMCR        = (volatile unsigned int *)0xE000EDFC; //address of the register
+
+
+    *SCB_DEMCR = *SCB_DEMCR | 0x01000000;
+    *DWT_CYCCNT = 0;
+    *DWT_CONTROL = *DWT_CONTROL | 1 ;
+    
+    SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);
+    SET_BIT(GPIOB->MODER, GPIO_MODER_MODER0);
+
+    uint32_t v = 0;
+    *DWT_CYCCNT = 0;
+    __asm volatile("NOP\n");
+    __asm volatile("NOP\n");
+    v = GPIOB->IDR;
+    __asm volatile("NOP\n");
+    __asm volatile("NOP\n");
+    v = (*DWT_CYCCNT);
+    pc.printf("Cycles: %lu\n", v);
+
     //Looping through the serial. No interrupts.
     while (1) {
         if(pc.readable())
