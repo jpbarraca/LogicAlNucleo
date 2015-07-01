@@ -4,7 +4,7 @@ A SUMP compatible Logical Analyser for the NucleoF401RE (STM32F4xx) up to 10MSPS
 
 This will turn any NucleoF401RE (will work with others but it is not tested) system into a Logical Analyser compatible with a subset of the SUMP protocol. It can be used with clients such as [PulseView](http://sigrok.org/wiki/PulseView), [sigrok-cli](http://sigrok.org/wiki/Sigrok-cli), and [LogicSniffer](http://www.lxtreme.nl/ols/). While it is not as feature complete as other products, such as the [OLS](http://dangerousprototypes.com/docs/Open_Bench_Logic_Sniffer), it can turn that STM32 board that is lying around into a no frills, bare to the bones, logic analyser.
 
-Sampling rate up to 500Khz should work on most platforms. Higher than that, only the F401RE, or other similar 84Mhz platform, should provide results with accurate timing measurements up to 10Mhz (probably near 20Mhz is achievable). If you wish to add support for other platforms, please focus in creating the appropriate unrolled loops. +150Mhz platforms can be easily supported as the more generic approach (wait_ns) can be used.
+Sampling rate up to 500KSPS should work on most platforms. Higher than that, only the F401RE, or other similar 84Mhz platform should provide results with accurate timing measurements up to 10MSPS (probably near 20MSPS is achievable). If you wish to add support for other platforms, please focus in creating the appropriate unrolled loops. +150Mhz platforms can be easily supported as the more generic approach (wait_ns) can be used. Alternatively an interrupt based approach would be much more precise (but slower).
 
 PORTB is current used, and Pins PB_0 to PB_7 are reported. Unfortunately these pins are scattered over the board and are not contiguous. Check [this](http://developer.mbed.org/platforms/ST-Nucleo-F401RE/) diagram to find them.
 
@@ -22,6 +22,10 @@ This implementation was based in the [mbed](https://mbed.org/) environment in or
 - Serial triggers
 - Post trigger delay
 - External and Internal test modes
+
+### Limitations
+
+- The board will frequently freeze and require a reset. This happens because the CPU is not that powerful. Reaching 10MSPS requires the use of synchronous code (instead of a much better asynchronous, Interrupt based approach). If the sampling function is waiting for results or for a trigger, the board will be "stuck". Just push the reset and move on as nothing is wrong.
 
 ## Screenshots
 Just to prove it works and because screenshots are always nice.
