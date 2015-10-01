@@ -36,73 +36,97 @@
 #define BYTE3(v) ((uint8_t)(v >> 16) & 0xff) //
 #define BYTE4(v) ((uint8_t)(v >> 24) & 0xff) //MSB
 
+#define printChar(v) pc.putc(v); while(!pc.writeable());
+
+#define printUInt(v)\
+    printChar(BYTE4(v));\
+    printChar(BYTE3(v));\
+    printChar(BYTE2(v));\
+    printChar(BYTE1(v));
+
+
+#define printString(v)\
+    for(unsigned int i =0;i<strlen(v);i++) printChar(v[i]);
+
 Serial pc(USBTX, USBRX);
 uint8_t cmd_buffer[5];
 uint8_t cmd_index = 0;
 Sampler sampler(&pc);
+DigitalOut led(LED2);
 
-void handleSerial()
+bool isShortCommand(uint8_t* b){
+    return b[0] <= 5 || b[0] == SUMP_XON || b[0] == SUMP_XOFF;
+}
+
+bool isLongCommand(uint8_t* b){
+    return (b[0] >= 0xC0 && b[0] <= 0xC2) || (b[0] >= 0x80 && b[0] <= 0x82);
+}
+
+void blink(unsigned int onTime,unsigned int offTime, unsigned int num){
+    for(unsigned int i=0;i<num;i++){
+        led = 1;
+        wait_ms(onTime);
+        led = 0;
+        wait_ms(offTime);
+    }
+}
+
+void handleSerial(char c)
 {
-    cmd_buffer[cmd_index++] = pc.getc();
+    cmd_buffer[(cmd_index++) % 5] = c;
 
-    if((cmd_buffer[0] & 0x80) == 0){
+    if(!isShortCommand(cmd_buffer) && ! isLongCommand(cmd_buffer)){
+        memset(cmd_buffer, 0, sizeof(cmd_buffer));
         cmd_index = 0;
-    }else if(cmd_index < 5){
         return;
     }
+
+    if(isLongCommand(cmd_buffer) && (cmd_index < 5 )){
+        return;
+    }
+
+    cmd_index = 0;
 
     switch(cmd_buffer[0]) {
         case SUMP_RESET : {
             sampler.reset();
             break;
         }
-
         case SUMP_QUERY:  {
-            pc.printf("1ALS");
+            printString("1ALS");
             break;
         }
         case SUMP_GET_METADATA: {
             uint32_t bufferSize = sampler.getBufferSize();
             uint32_t maxFrequency = sampler.getMaxFrequency();
+
             //NAME
-            pc.putc(0x01);
-            pc.putc('L');
-            pc.putc('O');
-            pc.putc('G');
-            pc.putc('I');
-            pc.putc('C');
-            pc.putc('N');
-            pc.putc('U');
-            pc.putc('C');
-            pc.putc('L');
-            pc.putc('E');
-            pc.putc('O');
-            pc.putc(0);
+            printChar(0x01);
+            printString("LogicalNucleo");
+            printChar(0x00);
 
             //SAMPLE MEM
-            pc.putc(0x21);
-            pc.putc(BYTE4(bufferSize));
-            pc.putc(BYTE3(bufferSize));
-            pc.putc(BYTE2(bufferSize));
-            pc.putc(BYTE1(bufferSize));
+            printChar(0x21);
+            printUInt(bufferSize);
+
+            //DYNAMIC MEM
+            printChar(0x22);
+            printUInt(0);
 
             //SAMPLE RATE
-            pc.putc(0x23);
-            pc.putc(BYTE4(maxFrequency));
-            pc.putc(BYTE3(maxFrequency));
-            pc.putc(BYTE2(maxFrequency));
-            pc.putc(BYTE1(maxFrequency));
+            printChar(0x23);
+            printUInt(maxFrequency);
 
             //Number of Probes
-            pc.putc(0x40);
-            pc.putc(0x08);
+            printChar(0x40);
+            printChar(0x08);
 
             //Protocol Version
-            pc.putc(0x41);
-            pc.putc(0x02);
-
+            printChar(0x41);
+            printChar(0x02);
+        
             //END
-            pc.putc(0);
+            printChar(0x00);
             break;
         }
         case SUMP_TEST:{
@@ -150,41 +174,38 @@ void handleSerial()
         }
         default: {
         }
-    }
-
-    cmd_index = 0;
-
+    }   
 }
+
 
 
 int main()
 {
     pc.baud(115200);
+    memset(cmd_buffer, 0, sizeof(cmd_buffer));
+    blink(250,750,1);
+
     volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004; //address of the register
     volatile unsigned int *DWT_CONTROL  = (volatile unsigned int *)0xE0001000; //address of the register
-    volatile unsigned int *SCB_DEMCR        = (volatile unsigned int *)0xE000EDFC; //address of the register
+    volatile unsigned int *SCB_DEMCR    = (volatile unsigned int *)0xE000EDFC; //address of the register
 
 
     *SCB_DEMCR = *SCB_DEMCR | 0x01000000;
     *DWT_CYCCNT = 0;
     *DWT_CONTROL = *DWT_CONTROL | 1 ;
     
+    //Setup port
     SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);
     SET_BIT(GPIOB->MODER, GPIO_MODER_MODER0);
 
-    uint32_t v = 0;
-    *DWT_CYCCNT = 0;
-    __asm volatile("NOP\n");
-    __asm volatile("NOP\n");
-    v = GPIOB->IDR;
-    __asm volatile("NOP\n");
-    __asm volatile("NOP\n");
-    v = (*DWT_CYCCNT);
-    pc.printf("Cycles: %lu\n", v);
+    //Flush it
+    while(pc.readable())
+        pc.getc();
 
-    //Looping through the serial. No interrupts.
+    //Looping through the serial.   
     while (1) {
-        if(pc.readable())
-            handleSerial();
+        if(pc.readable() == 1){
+            handleSerial(pc.getc());
+        }
     }
 }

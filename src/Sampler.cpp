@@ -39,6 +39,8 @@
 
 __attribute((section("AHBSRAM0"),aligned))  uint8_t  main_buffer[BUFFER_SIZE];
 
+#define likely(x) __builtin_expect((x),1)
+
 
 Sampler::Sampler(Serial *sp)
 {
@@ -46,7 +48,7 @@ Sampler::Sampler(Serial *sp)
     bufferSize = BUFFER_SIZE;
     buffer =  main_buffer;
     reset();
-
+    EnablePrecisionTiming();
 }
 
 void Sampler::reset()
@@ -58,12 +60,8 @@ void Sampler::reset()
     setFlags(0);
     setSampleNumber(bufferSize);
     setSamplingDelay(0);
-    //Setup port
-    SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);
-    SET_BIT(GPIOB->MODER, GPIO_MODER_MODER0);
-
-    EnablePrecisionTiming();
 }
+
 uint32_t Sampler::getMaxFrequency(){
     return MAX_FREQUENCY;
 }
@@ -113,7 +111,7 @@ void Sampler::runTest()
 void Sampler::start()
 {
 
-    int16_t snum = sampleNumber;
+    uint16_t snum = sampleNumber;
 
     //Due to Loop Unrooling
     if(snum < 8)
@@ -131,7 +129,7 @@ void Sampler::start()
     //TODO: Migrate to a more generic approach through wait_ns
     //10Mhz
     if(samplingPeriod == 100){
-        while(snum >= 8){
+        while(likely(snum >= 8)){
             buffer[snum] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\n");
             buffer[snum-1] = GPIOB->IDR;
@@ -152,7 +150,7 @@ void Sampler::start()
         }
     //5Mhz
      }else  if(samplingPeriod == 200){
-        while(snum >= 8){
+        while(likely(snum >= 8)){
             buffer[snum] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             buffer[snum-1] = GPIOB->IDR;
@@ -173,7 +171,7 @@ void Sampler::start()
         }
     //2Mhz
      }else if(samplingPeriod == 500){
-        while(snum >= 8){
+        while(likely(snum >= 8)){
             buffer[snum] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
@@ -226,8 +224,8 @@ void Sampler::start()
         }
     //Others
      }else {
-        uint32_t c = (samplingPeriod/1000) * SYSTEM_CLOCK_MULT;
-        while(snum> 0){
+        uint32_t c = (samplingPeriod * SYSTEM_CLOCK_MULT)/1000.0;
+        while(likely(snum> 8)){
             buffer[snum] = GPIOB->IDR;
             wait_ns(c);
             buffer[snum-1] = GPIOB->IDR;
@@ -252,8 +250,7 @@ void Sampler::start()
 
 void Sampler::arm()
 {
- if (flags & FLAGS_TEST || true)
-    {
+    if (flags & FLAGS_TEST) {
         PwmOut pwm(D9);
         pwm.period_us((uint16_t) 50);
         pwm.pulsewidth_us((uint16_t) 20);
@@ -263,14 +260,13 @@ void Sampler::arm()
         pwm.period_us((uint16_t) 0);
         pwm.pulsewidth_us(0);
     }else{
-        __disable_irq(); //To reduce jitter
         start();
-        __enable_irq();
     }
 
     for(uint16_t i = 0;i < sampleNumber; i++)
     {
         pc->putc(buffer[i]);
+        while(!pc->writeable());
     }
 }
 
