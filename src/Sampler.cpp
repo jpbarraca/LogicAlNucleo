@@ -129,13 +129,10 @@ void Sampler::start()
     }
 
     if(triggerState == 1){
-        do{
-            buffer[snum - 1] = GPIOB->IDR;
-        }while((buffer[snum - 1] & triggerMask) != triggerValue);
+        while((GPIOB->IDR & triggerMask) != triggerValue);
     }
     
-    //TODO: Migrate to a more generic approach through wait_ns
-    //10Mhz (Not really...)
+    //10Mhz (Close but not really...)
     if(samplingPeriod == 100){
         while(likely(snum >= 4)){
             buffer[snum - 1] = GPIOB->IDR;

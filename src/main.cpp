@@ -49,9 +49,8 @@
     for(unsigned int i =0;i<strlen(v);i++) printChar(v[i]);
 
 Serial pc(USBTX, USBRX);
-Sampler sampler(&pc);
-
 DigitalOut led(LED2);
+Sampler sampler(&pc);
 
 inline void blink(unsigned int onTime,unsigned int offTime, unsigned int num){
     for(unsigned int i=0;i<num;i++){
@@ -80,7 +79,6 @@ void handleSerial()
         cmd_buffer[cmd_index] = pc.getc();
         switch(cmd_buffer[0]) {
             case SUMP_RESET : {
-                sampler.reset();
                 break;
             }
             case SUMP_QUERY:  {
@@ -177,9 +175,10 @@ void handleSerial()
                 if(cmd_index < 5)
                     continue;
 
-                uint16_t serial = (*((uint16_t*)(cmd_buffer + 1)) & 0x04) > 0 ? 1 : 0;
-                uint16_t state = (*((uint16_t*)(cmd_buffer + 1)) & 0x08) > 0 ? 1 : 0;
-                if(serial)
+                uint8_t serial = (*((uint8_t*)(cmd_buffer + 4)) & 0x04) > 0 ? 1 : 0;
+                uint8_t state = (*((uint8_t*)(cmd_buffer + 4)) & 0x08) > 0 ? 1 : 0;
+
+                if(serial == 1)
                     sampler.setTriggerState(0);//Not supported
                 else
                     sampler.setTriggerState(state); 
