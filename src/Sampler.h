@@ -23,6 +23,7 @@ public:
     void setSamplingDelay(uint16_t);
     void setTriggerMask(uint32_t);
     void setTriggerValue(uint32_t);
+    void setTriggerState(uint8_t);
     void setFlags(uint32_t);
 
 
@@ -37,6 +38,7 @@ private:
     uint32_t sampleDelay;
     uint32_t triggerMask;
     uint32_t triggerValue;
+    uint8_t  triggerState;
     uint32_t flags;
 
     uint32_t bufferSize;

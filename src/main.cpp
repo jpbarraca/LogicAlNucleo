@@ -49,20 +49,11 @@
     for(unsigned int i =0;i<strlen(v);i++) printChar(v[i]);
 
 Serial pc(USBTX, USBRX);
-uint8_t cmd_buffer[5];
-uint8_t cmd_index = 0;
 Sampler sampler(&pc);
+
 DigitalOut led(LED2);
 
-bool isShortCommand(uint8_t* b){
-    return b[0] <= 5 || b[0] == SUMP_XON || b[0] == SUMP_XOFF;
-}
-
-bool isLongCommand(uint8_t* b){
-    return (b[0] >= 0xC0 && b[0] <= 0xC2) || (b[0] >= 0x80 && b[0] <= 0x82);
-}
-
-void blink(unsigned int onTime,unsigned int offTime, unsigned int num){
+inline void blink(unsigned int onTime,unsigned int offTime, unsigned int num){
     for(unsigned int i=0;i<num;i++){
         led = 1;
         wait_ms(onTime);
@@ -71,110 +62,145 @@ void blink(unsigned int onTime,unsigned int offTime, unsigned int num){
     }
 }
 
-void handleSerial(char c)
+void handleSerial()
 {
-    cmd_buffer[(cmd_index++) % 5] = c;
+    uint8_t cmd_buffer[5];
+    uint8_t cmd_index = 0;
+    memset(cmd_buffer, 0, sizeof(cmd_buffer));
+    
+    led = 0;
 
-    if(!isShortCommand(cmd_buffer) && ! isLongCommand(cmd_buffer)){
-        memset(cmd_buffer, 0, sizeof(cmd_buffer));
-        cmd_index = 0;
-        return;
-    }
+    //Looping through the serial.   
+    while (1) {
+        led = 0;
 
-    if(isLongCommand(cmd_buffer) && (cmd_index < 5 )){
-        return;
-    }
-
-    cmd_index = 0;
-
-    switch(cmd_buffer[0]) {
-        case SUMP_RESET : {
-            sampler.reset();
-            break;
-        }
-        case SUMP_QUERY:  {
-            printString("1ALS");
-            break;
-        }
-        case SUMP_GET_METADATA: {
-            uint32_t bufferSize = sampler.getBufferSize();
-            uint32_t maxFrequency = sampler.getMaxFrequency();
-
-            //NAME
-            printChar(0x01);
-            printString("LogicalNucleo");
-            printChar(0x00);
-
-            //SAMPLE MEM
-            printChar(0x21);
-            printUInt(bufferSize);
-
-            //DYNAMIC MEM
-            printChar(0x22);
-            printUInt(0);
-
-            //SAMPLE RATE
-            printChar(0x23);
-            printUInt(maxFrequency);
-
-            //Number of Probes
-            printChar(0x40);
-            printChar(0x08);
-
-            //Protocol Version
-            printChar(0x41);
-            printChar(0x02);
+        while(!pc.readable());
         
-            //END
-            printChar(0x00);
-            break;
+        led = 1;        
+        cmd_buffer[cmd_index] = pc.getc();
+        switch(cmd_buffer[0]) {
+            case SUMP_RESET : {
+                sampler.reset();
+                break;
+            }
+            case SUMP_QUERY:  {
+                printString("1ALS");
+                break;
+            }
+            case SUMP_GET_METADATA: {
+                uint32_t bufferSize = sampler.getBufferSize();
+                uint32_t maxFrequency = sampler.getMaxFrequency();
+
+                while(!pc.writeable());
+                //NAME
+                printChar(0x01);
+                printString("LogicalNucleo");
+                printChar(0x00);
+
+                //SAMPLE MEM
+                printChar(0x21);
+                printUInt(bufferSize);
+
+                //DYNAMIC MEM
+                printChar(0x22);
+                printUInt(0);
+
+                //SAMPLE RATE
+                printChar(0x23);
+                printUInt(maxFrequency);
+
+                //Number of Probes
+                printChar(0x40);
+                printChar(0x08);
+
+                //Protocol Version
+                printChar(0x41);
+                printChar(0x02);
+            
+                //END
+                printChar(0x00);
+                break;
+            }
+            case SUMP_TEST:{
+                sampler.runTest();
+                break;    
+            }
+            case SUMP_ARM: {
+                sampler.arm();
+                break;
+            }
+            case SUMP_XON: {
+                sampler.start();
+                break;
+            }
+            case SUMP_XOFF: {
+                sampler.stop();
+                break;
+            }
+            case SUMP_SET_READ_DELAY_COUNT: {
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+
+                uint16_t readCount  = 1 + *((uint16_t*)(cmd_buffer + 1));
+                uint16_t delayCount = * ((uint16_t*)(cmd_buffer + 3));
+                sampler.setSampleNumber(4 * readCount);
+                sampler.setSamplingDelay(4 * delayCount);
+                break;
+            }
+            case SUMP_SET_DIVIDER: {
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+                
+                uint32_t divider = *((uint32_t *)(cmd_buffer + 1));
+                sampler.setSamplingDivider(divider);
+                break;
+            }
+            case SUMP_SET_TRIGGER_MASK:{
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+                sampler.setTriggerMask(*(uint32_t *)(cmd_buffer + 1));
+                break;
+            }
+            case SUMP_SET_TRIGGER_VALUES:{
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+                
+                sampler.setTriggerValue(*(uint32_t *)(cmd_buffer + 1));
+                break;
+            }
+            case SUMP_SET_TRIGGER_CONF:{
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+
+                uint16_t serial = (*((uint16_t*)(cmd_buffer + 1)) & 0x04) > 0 ? 1 : 0;
+                uint16_t state = (*((uint16_t*)(cmd_buffer + 1)) & 0x08) > 0 ? 1 : 0;
+                if(serial)
+                    sampler.setTriggerState(0);//Not supported
+                else
+                    sampler.setTriggerState(state); 
+
+                break;
+            }
+            case SUMP_SET_FLAGS:{
+                cmd_index ++;
+                if(cmd_index < 5)
+                    continue;
+                
+                sampler.setFlags(*(uint32_t *)(cmd_buffer + 1));
+                break;
+            }
+            default: {
+            }
         }
-        case SUMP_TEST:{
-            sampler.runTest();
-            break;    
-        }
-        case SUMP_ARM: {
-            sampler.arm();
-            break;
-        }
-        case SUMP_XON: {
-            sampler.start();
-            break;
-        }
-        case SUMP_XOFF: {
-            sampler.stop();
-            break;
-        }
-        case SUMP_SET_READ_DELAY_COUNT: {
-            uint16_t readCount  = 1 + *((uint16_t*)(cmd_buffer+1));
-            uint16_t delayCount = *((uint16_t*)(cmd_buffer+3));
-            sampler.setSampleNumber(4*readCount);
-            sampler.setSamplingDelay(4*delayCount);
-            break;
-        }
-        case SUMP_SET_DIVIDER: {
-            uint32_t divider = *((uint32_t*)(cmd_buffer+1));
-            sampler.setSamplingDivider(divider);
-            break;
-        }
-        case SUMP_SET_TRIGGER_MASK:{
-            sampler.setTriggerMask(*(uint32_t*)(cmd_buffer+1));
-            break;
-        }
-        case SUMP_SET_TRIGGER_VALUES:{
-            sampler.setTriggerValue(*(uint32_t*)(cmd_buffer+1));
-            break;
-        }
-        case SUMP_SET_TRIGGER_CONF:{
-            break;
-        }
-        case SUMP_SET_FLAGS:{
-            sampler.setFlags(*(uint32_t*)(cmd_buffer+1));
-            break;
-        }
-        default: {
-        }
-    }   
+
+        cmd_index = 0;
+        memset(cmd_buffer, 0, sizeof(cmd_buffer));
+    }
 }
 
 
@@ -182,30 +208,12 @@ void handleSerial(char c)
 int main()
 {
     pc.baud(115200);
-    memset(cmd_buffer, 0, sizeof(cmd_buffer));
-    blink(250,750,1);
-
-    volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004; //address of the register
-    volatile unsigned int *DWT_CONTROL  = (volatile unsigned int *)0xE0001000; //address of the register
-    volatile unsigned int *SCB_DEMCR    = (volatile unsigned int *)0xE000EDFC; //address of the register
-
-
-    *SCB_DEMCR = *SCB_DEMCR | 0x01000000;
-    *DWT_CYCCNT = 0;
-    *DWT_CONTROL = *DWT_CONTROL | 1 ;
-    
-    //Setup port
-    SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);
-    SET_BIT(GPIOB->MODER, GPIO_MODER_MODER0);
 
     //Flush it
-    while(pc.readable())
+    while(pc.readable() == 1)
         pc.getc();
 
-    //Looping through the serial.   
-    while (1) {
-        if(pc.readable() == 1){
-            handleSerial(pc.getc());
-        }
-    }
+    blink(50,100,5);
+
+    handleSerial();
 }

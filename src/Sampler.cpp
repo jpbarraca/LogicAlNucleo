@@ -15,7 +15,6 @@
 #include "mbed.h"
 #include "Sampler.h"
 #include <algorithm>
-#include "delay.h"
 
 #define TRIGGER_PARALLEL 0
 #define TRIGGER_SERIAL 1
@@ -41,14 +40,20 @@ __attribute((section("AHBSRAM0"),aligned))  uint8_t  main_buffer[BUFFER_SIZE];
 
 #define likely(x) __builtin_expect((x),1)
 
-
 Sampler::Sampler(Serial *sp)
 {
     pc = sp;
     bufferSize = BUFFER_SIZE;
     buffer =  main_buffer;
+
+    //Setup port
+    SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);
+    GPIOB->OSPEEDR = 3;         // High Speed
+    GPIOB->BSRR = 0xFFFF0000;   // No Special pins
+    GPIOB->MODER = 0;           // Input
+    GPIOB->PUPDR = 0;           // No pull up or pull down
+
     reset();
-    EnablePrecisionTiming();
 }
 
 void Sampler::reset()
@@ -56,6 +61,7 @@ void Sampler::reset()
     buffer_index = 0;
     setTriggerMask(0);
     setTriggerValue(0);
+    setTriggerState(0);
     setSamplingDivider(11);
     setFlags(0);
     setSampleNumber(bufferSize);
@@ -81,7 +87,7 @@ void Sampler::setSamplingDivider(uint32_t divider)
 
 void Sampler::setSampleNumber(uint32_t s)
 {
-    sampleNumber = min((uint32_t) bufferSize,s);
+    sampleNumber = min((uint32_t) bufferSize, s);
 }
 
 void Sampler::setSamplingDelay(uint16_t s)
@@ -98,6 +104,10 @@ void Sampler::setTriggerValue(uint32_t s)
     triggerValue = s & 0xFF;
 }
 
+void Sampler::setTriggerState(uint8_t state){
+    triggerState = state;
+}
+
 void Sampler::setFlags(uint32_t s)
 {
     flags = s;
@@ -111,154 +121,180 @@ void Sampler::runTest()
 void Sampler::start()
 {
 
-    uint16_t snum = sampleNumber;
+    int32_t snum = sampleNumber;
 
-    //Due to Loop Unrooling
-    if(snum < 8)
-        snum = 8;
 
     if(sampleDelay > 0){
         wait_us(sampleDelay);
     }
 
-    buffer[snum] = GPIOB->IDR;
-    while((buffer[snum] & triggerMask) != triggerValue){
-        buffer[snum] = GPIOB->IDR;
+    if(triggerState == 1){
+        do{
+            buffer[snum - 1] = GPIOB->IDR;
+        }while((buffer[snum - 1] & triggerMask) != triggerValue);
     }
-
+    
     //TODO: Migrate to a more generic approach through wait_ns
-    //10Mhz
+    //10Mhz (Not really...)
     if(samplingPeriod == 100){
-        while(likely(snum >= 8)){
-            buffer[snum] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-1] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-2] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-3] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-4] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-5] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-6] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\n");
-            buffer[snum-7] = GPIOB->IDR;
-            __asm volatile ( " NOP\n");
-            snum-=8;
+        while(likely(snum >= 4)){
+            buffer[snum - 1] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\n");
+            
+            buffer[snum - 2] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\n");
+            buffer[snum - 3] = GPIOB->IDR;  
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\n");
+            buffer[snum - 4] = GPIOB->IDR;  
+            snum -= 4;
         }
-    //5Mhz
+    //5Mhz (Almost)
      }else  if(samplingPeriod == 200){
-        while(likely(snum >= 8)){
-            buffer[snum] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-1] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-2] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-3] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-4] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-5] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-6] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            buffer[snum-7] = GPIOB->IDR;
-            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            snum-=8;
+        while(likely(snum >= 4)){
+            buffer[snum - 1] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            
+            buffer[snum - 2] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            
+            buffer[snum - 3] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            
+            buffer[snum - 4] = GPIOB->IDR;
+            snum -= 4;
         }
-    //2Mhz
+    //2Mhz (True)
      }else if(samplingPeriod == 500){
-        while(likely(snum >= 8)){
-            buffer[snum] = GPIOB->IDR;
+        while(likely(snum >= 4)){
+            
+            buffer[snum - 1] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 2] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\n\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 3] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\n\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 4] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\n");
+            snum -= 4;
+        }
+        //1Mhz (True)
+     }else if(samplingPeriod == 1000){
+        while(likely(snum >= 4)){
 
-            buffer[snum-1] = GPIOB->IDR;
+            buffer[snum - 1] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-2] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-3] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 2] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-4] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-5] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 3] = GPIOB->IDR;
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-6] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
-            __asm volatile ( " NOP\nNOP\nNOP\n");
-
-            buffer[snum-7] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
+            
+            buffer[snum - 4] = GPIOB->IDR;
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
+            __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");
             __asm volatile ( " NOP\nNOP\nNOP\n");
 
-            snum-=8;
+            snum -= 4;
         }
     //Others
      }else {
-        uint32_t c = (samplingPeriod * SYSTEM_CLOCK_MULT)/1000.0;
-        while(likely(snum> 8)){
-            buffer[snum] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-1] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-2] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-3] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-4] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-5] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-6] = GPIOB->IDR;
-            wait_ns(c);
-            buffer[snum-7] = GPIOB->IDR;
-            wait_ns(c);
-            snum-=8;
+        uint32_t c = samplingPeriod/1000.0;
+        while(likely(snum >= 4)){
+            buffer[snum - 1] = GPIOB->IDR;
+            wait_us(c);
+            buffer[snum - 2] = GPIOB->IDR;
+            wait_us(c);
+            buffer[snum - 3] = GPIOB->IDR;
+            wait_us(c);
+            buffer[snum - 4] = GPIOB->IDR;
+            wait_us(c);
+            snum -= 4;
         }
     }
-
 }
 
 void Sampler::arm()
 {
     if (flags & FLAGS_TEST) {
-        PwmOut pwm(D9);
-        pwm.period_us((uint16_t) 50);
-        pwm.pulsewidth_us((uint16_t) 20);
+        PwmOut pwm0(PB_0);
+        pwm0.period_us(1);
+        pwm0.write(0.5);
+
+        PwmOut pwm1(PB_1);
+        pwm1.period_us(10);
+        pwm1.write(0.5);
+
+        PwmOut pwm2(PB_3);
+        pwm2.period_us(100);
+        pwm2.write(0.5);
+
+        PwmOut pwm3(PB_4);
+        pwm3.period_us(500);
+        pwm3.write(0.5);
+
+        PwmOut pwm4(PB_5);
+        pwm4.period_ms(1);
+        pwm4.write(0.5);
+        
+        PwmOut pwm5(PB_6);
+        pwm5.period_ms(10);
+        pwm5.write(0.5);
+
+        PwmOut pwm6(PB_7);
+        pwm6.period_ms(100);
+        pwm6.write(0.5);
 
         start();
 
-        pwm.period_us((uint16_t) 0);
-        pwm.pulsewidth_us(0);
+        pwm0.write(0);
+        pwm1.write(0);
+        pwm2.write(0);
+        pwm3.write(0);
+        pwm4.write(0);
+        pwm5.write(0);
+        pwm6.write(0);
     }else{
         start();
     }
