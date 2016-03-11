@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2006-2016 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,8 @@ typedef enum {
     MODE_RESET,
     MODE_NORMAL,
     MODE_SILENT,
-    MODE_TEST_GLOBAL,
     MODE_TEST_LOCAL,
+    MODE_TEST_GLOBAL,
     MODE_TEST_SILENT
 } CanMode;
 
